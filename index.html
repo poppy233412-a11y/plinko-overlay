@@ -585,13 +585,21 @@ function createBall(name,avatar){
 }
 
 function land(ball){
-  updateSlots();
-  ball.landed=true;
+// 🎯 FORCE WIN LOGIC (30% 10K)
+let isJackpot = Math.random() < 0.3;
 
-  let slot=slots.find(s=>ball.x>=s.x1&&ball.x<s.x2);
-  if(!slot){
-    slot=ball.x<W/2?slots[0]:slots[slots.length-1];
-  }
+let slot;
+
+if(isJackpot){
+  // choose left or right 10K
+  const edges = [0, slots.length - 1];
+  const chosen = edges[Math.floor(Math.random()*edges.length)];
+  slot = slots[chosen];
+}else{
+  // normal slots (exclude 10K edges)
+  const midSlots = slots.slice(1, slots.length - 1);
+  slot = midSlots[Math.floor(Math.random()*midSlots.length)];
+}
 
   ball.x=slot.cx;
   ball.y=slot.y-12;
