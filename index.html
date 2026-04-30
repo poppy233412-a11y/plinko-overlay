@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Kick Plinko Clean UI Overlay</title>
+<style>
+  :root{
+    --w:873px;
+    --h:626px;
+    --bg:#0f2633;
+    --text:#ffffff;
+  }
+
+  *{box-sizing:border-box}
+
+  html,body{
+    margin:0;
+    width:100%;
+    height:100%;
+    overflow:hidden;
+    background:transparent;
+    font-family:Arial, Helvetica, sans-serif;
+  }
+
+  #app{
+    position:relative;
+    width:var(--w);
+    height:var(--h);
+    overflow:hidden;
+    background:#0f2633;
+  }
+
+  #app.transparent{
+    background:transparent;
+  }
+
+  #boardCanvas{
+    position:absolute;
+    inset:0;
+    z-index:1;
+  }
+
+  #ballsLayer{
+    position:absolute;
+    inset:0;
+    z-index:5;
+    pointer-events:none;
+  }
+
+  .ball{
+    position:absolute;
+    width:42px;
+    height:60px;
+    pointer-events:none;
+    will-change:transform;
+    filter:drop-shadow(0 5px 6px rgba(0,0,0,.65));
+  }
+
+  .avatar{
+    width:34px;
+    height:34px;
+    border-radius:50%;
+    margin:auto;
+    background:#162235 center/cover no-repeat;
+    border:2px solid #fff;
+    box-shadow:0 0 0 2px #79f46b,0 0 10px rgba(121,244,107,.6);
+  }
+
+  .name{
+    max-width:70px;
+    margin:3px auto 0;
+    padding:1px 5px;
+    background:rgba(0,0,0,.68);
+    color:#fff;
+    border-radius:999px;
+    text-align:center;
+    font-size:10px;
+    font-weight:800;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .ball.out{
+    animation:popOut .55s ease forwards;
+  }
+
+  @keyframes popOut{
+    0%{opacity:1;scale:1}
+    45%{scale:1.22}
+    100%{opacity:0;scale:.12}
+  }
+
+  #rewards{
+    position:absolute;
+    left:136px;
+    right:136px;
+    bottom:8px;
+    height:33px;
+    display:grid;
+    grid-template-columns:repeat(17,1fr);
+    gap:4px;
+    z-index:8;
+  }
+
+  .reward{
+    border-radius:4px;
+    display:grid;
+    place-items:center;
+    font-size:14px;
+    line-height:1;
+    font-weight:900;
+    color:#111;
+    border-bottom:4px solid rgba(255,255,255,.82);
+    box-shadow:inset 0 2px 5px rgba(255,255,255,.38);
+    transition:.16s ease;
+  }
+
+  .reward.hit{
+    transform:translateY(-6px) scale(1.08);
+    filter:brightness(1.28);
+    box-shadow:0 0 20px rgba(255,214,0,.8), inset 0 2px 5px rgba(255,255,255,.5);
+  }
+
+  .float{
+    position:absolute;
+    z-index:30;
+    font-size:26px;
+    font-weight:1000;
+    color:#fff;
+    text-shadow:0 0 9px #ffd400,0 3px 4px #000;
+    animation:floatUp 1.05s ease forwards;
+    pointer-events:none;
+  }
+
+  @keyframes floatUp{
+    0%{opacity:0;transform:translate(-50%,8px) scale(.6)}
+    18%{opacity:1;transform:translate(-50%,-5px) scale(1.08)}
+    100%{opacity:0;transform:translate(-50%,-60px) scale(.9)}
+  }
+
+  #popup{
+    position:absolute;
+    inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:90;
+    background:radial-gradient(circle,rgba(255,212,0,.18),transparent 48%);
+  }
+
+  #popup.show{display:flex}
+
+  .popup-card{
+    width:390px;
+    padding:28px;
+    border-radius:18px;
+    text-align:center;
+    background:linear-gradient(180deg,#112b44,#06111f);
+    border:3px solid #ffd400;
+    box-shadow:0 0 42px rgba(255,212,0,.75);
+    animation:bounce .65s cubic-bezier(.2,1.45,.35,1) both;
+  }
+
+  @keyframes bounce{
+    0%{opacity:0;transform:scale(.55)}
+    70%{opacity:1;transform:scale(1.08)}
+    100%{transform:scale(1)}
+  }
+
+  .pop-title{
+    font-size:30px;
+    color:#ffd400;
+    font-weight:1000;
+    text-shadow:0 0 12px #ffd400;
+  }
+
+  .pop-avatar{
+    width:90px;
+    height:90px;
+    border-radius:50%;
+    margin:14px auto;
+    border:4px solid white;
+    background:center/cover no-repeat;
+  }
+
+  .pop-name{
+    font-size:23px;
+    color:white;
+    font-weight:1000;
+  }
+
+  .pop-hit{
+    font-size:25px;
+    color:white;
+    font-weight:1000;
+    margin-top:7px;
+  }
+
+  #confetti{
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+    z-index:91;
+    overflow:hidden;
+  }
+
+  .confetti{
+    position:absolute;
+    width:8px;
+    height:14px;
+    animation:fall 2s linear forwards;
+  }
+
+  @keyframes fall{
+    0%{transform:translateY(-40px) rotate(0);opacity:1}
+    100%{transform:translateY(680px) rotate(700deg);opacity:0}
+  }
+
+  #adminToggle{
+    position:absolute;
+    top:16px;
+    right:16px;
+    z-index:200;
+    width:36px;
+    height:36px;
+    border-radius:50%;
+    border:0;
+    background:rgba(255,255,255,.13);
+    color:#fff;
+    cursor:pointer;
+    opacity:.55;
+  }
+
+  #adminToggle:hover{opacity:1}
+
+  #adminPanel{
+    position:absolute;
+    top:58px;
+    right:14px;
+    width:320px;
+    max-height:550px;
+    overflow:auto;
+    z-index:210;
+    display:none;
+    padding:14px;
+    color:white;
+    border-radius:12px;
+    background:rgba(7,17,27,.96);
+    border:1px solid rgba(255,255,255,.14);
+    box-shadow:0 12px 35px rgba(0,0,0,.5);
+  }
+
+  #adminPanel.show{display:block}
+
+  #adminPanel h3{margin:0 0 12px}
+
+  .field{
+    display:grid;
+    grid-template-columns:1fr 90px;
+    align-items:center;
+    gap:8px;
+    margin:9px 0;
+    font-size:13px;
+    font-weight:700;
+  }
+
+  input,textarea{
+    width:100%;
+    background:#102235;
+    color:white;
+    border:1px solid rgba(255,255,255,.15);
+    border-radius:6px;
+    padding:8px;
+    outline:none;
+    font-weight:700;
+  }
+
+  textarea{
+    height:62px;
+    font-family:Consolas,monospace;
+    font-size:11px;
+    resize:none;
+  }
+
+  button{
+    border:0;
+    border-radius:7px;
+    padding:9px 10px;
+    font-weight:900;
+    cursor:pointer;
+    color:#fff;
+    background:#246ef0;
+  }
+
+  .green{background:#55c94b}
+  .dark{background:#26394c}
+  .gold{background:#ffb000;color:#111}
+
+  #toast{
+    position:absolute;
+    top:14px;
+    left:50%;
+    transform:translateX(-50%);
+    z-index:300;
+    padding:8px 13px;
+    border-radius:999px;
+    background:rgba(0,0,0,.72);
+    color:white;
+    display:none;
+    font-weight:800;
+    font-size:13px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="boardCanvas" width="873" height="626"></canvas>
+  <div id="ballsLayer"></div>
+  <div id="rewards"></div>
+
+  <button id="adminToggle" onclick="toggleAdmin()">⚙</button>
+
+  <div id="adminPanel">
+    <h3>Settings / Demo</h3>
+    <div class="field"><label>Command</label><input id="cmd"></div>
+    <div class="field"><label>Ball Size</label><input id="ballSize" type="number"></div>
+    <div class="field"><label>Fall Speed</label><input id="speed" type="number" step=".1"></div>
+    <div class="field"><label>Max Balls</label><input id="maxBalls" type="number"></div>
+    <div class="field"><label>User CD sec</label><input id="userCd" type="number"></div>
+    <div class="field"><label>Global CD sec</label><input id="globalCd" type="number"></div>
+    <div class="field"><label>Popup sec</label><input id="popupDur" type="number"></div>
+    <div class="field"><label>Transparent</label><input id="transparent" type="checkbox"></div>
+    <label style="font-size:13px;font-weight:800">Rewards JSON</label>
+    <textarea id="rewardValues"></textarea>
+    <br><br>
+    <button class="green" onclick="saveSettings()">Save</button>
+    <button class="gold" onclick="demoDrop()">Demo Drop</button>
+    <button class="dark" onclick="toggleAutoDemo()">Auto</button>
+    <button class="dark" onclick="clearStats()">Clear</button>
+  </div>
+
+  <div id="popup">
+    <div class="popup-card">
+      <div class="pop-title">CONGRATULATIONS!</div>
+      <div id="popAvatar" class="pop-avatar"></div>
+      <div id="popName" class="pop-name"></div>
+      <div class="pop-hit">You hit 10K!</div>
+    </div>
+  </div>
+
+  <div id="confetti"></div>
+  <div id="toast"></div>
+</div>
+
+<script>
+/*
+  KICK CHAT HOOK:
+  Connect your Kick chat later and call:
+
+  handleChatMessage(username, avatarUrl, message)
+
+  Example:
+  handleChatMessage("PlayerOne", "https://avatar-link.png", "!drop");
+*/
+
+const DEFAULT={
+  command:"!drop",
+  ballSize:34,
+  speed:1.15,
+  maxBalls:18,
+  userCooldown:8,
+  globalCooldown:.4,
+  popupDuration:5,
+  sound:true,
+  celebration:true,
+  transparent:false,
+  rewards:["10K","216","26","7.0","2.5","1.1","0.1","0.1","0.1","0.1","0.1","1.1","2.5","7.0","26","216","10K"],
+  colors:["#FFD400","#FFC107","#FFB000","#FF9800","#FF8C00","#FF7A00","#FF6A00","#FF5A00","#FF4A00","#FF3B00","#FF4A00","#FF5A00","#FF6A00","#FF7A00","#FF8C00","#FFC107","#FFD400"]
+};
+
+let cfg=JSON.parse(localStorage.getItem("clean_plinko_cfg")||"null")||{...DEFAULT};
+let db=JSON.parse(localStorage.getItem("clean_plinko_db")||"{}");
+let balls=[],pegs=[],slots=[],autoTimer=null,lastGlobal=0;
+
+const W=873,H=626;
+const canvas=document.getElementById("boardCanvas");
+const ctx=canvas.getContext("2d");
+const layer=document.getElementById("ballsLayer");
+const app=document.getElementById("app");
+
+function init(){
+  applyVisual();
+  fillSettings();
+  buildRewards();
+  buildPegs();
+  drawBoard();
+  requestAnimationFrame(loop);
+}
+
+function applyVisual(){
+  app.classList.toggle("transparent",!!cfg.transparent);
+}
+
+function buildPegs(){
+  pegs=[];
+  const rows=16;
+  const startY=35;
+  const gapY=35;
+  const gapX=35.3;
+
+  for(let r=0;r<rows;r++){
+    const count=3+r;
+    const total=(count-1)*gapX;
+    const startX=W/2-total/2;
+    const y=startY+r*gapY;
+
+    for(let c=0;c<count;c++){
+      pegs.push({x:startX+c*gapX,y,r:4.2});
+    }
+  }
+}
+
+function drawBoard(){
+  ctx.clearRect(0,0,W,H);
+
+  pegs.forEach(p=>{
+    ctx.save();
+    ctx.shadowColor="rgba(255,255,255,.45)";
+    ctx.shadowBlur=4;
+    ctx.fillStyle="#f4f6f8";
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+function buildRewards(){
+  const el=document.getElementById("rewards");
+  el.innerHTML="";
+
+  cfg.rewards.forEach((r,i)=>{
+    const d=document.createElement("div");
+    d.className="reward";
+    d.textContent=r;
+    const color=cfg.colors[i]||"#ff9800";
+    d.style.background=`linear-gradient(180deg,${lighten(color,22)},${color})`;
+    d.style.color=needsDark(color)?"#111":"#fff";
+    el.appendChild(d);
+  });
+
+  setTimeout(updateSlots,50);
+}
+
+function updateSlots(){
+  const parent=app.getBoundingClientRect();
+  const boxes=[...document.querySelectorAll(".reward")];
+  slots=boxes.map((b,i)=>{
+    const r=b.getBoundingClientRect();
+    return{
+      i,
+      value:cfg.rewards[i],
+      num:valueNum(cfg.rewards[i]),
+      x1:r.left-parent.left,
+      x2:r.right-parent.left,
+      cx:(r.left+r.right)/2-parent.left,
+      y:r.top-parent.top
+    };
+  });
+}
+
+function loop(){
+  const grav=.145*cfg.speed;
+
+  balls.forEach(ball=>{
+    if(ball.landed)return;
+
+    ball.vy+=grav;
+    ball.vy=Math.min(ball.vy,6.6*cfg.speed);
+    ball.vx*=.996;
+    ball.x+=ball.vx;
+    ball.y+=ball.vy;
+
+    if(ball.x<120){ball.x=120;ball.vx=Math.abs(ball.vx)*.75}
+    if(ball.x>W-120){ball.x=W-120;ball.vx=-Math.abs(ball.vx)*.75}
+
+    pegs.forEach((p,idx)=>{
+      const dx=ball.x-p.x;
+      const dy=ball.y-p.y;
+      const dist=Math.hypot(dx,dy);
+      const min=ball.r*.54+p.r;
+
+      if(dist<min && dist>.01){
+        const now=performance.now();
+        if((ball.cd[idx]||0)+75>now)return;
+        ball.cd[idx]=now;
+
+        const nx=dx/dist;
+        const ny=dy/dist;
+
+        ball.x=p.x+nx*min;
+        ball.y=p.y+ny*min;
+
+        const dot=ball.vx*nx+ball.vy*ny;
+        ball.vx-=1.55*dot*nx;
+        ball.vy-=1.18*dot*ny;
+
+        ball.vx+=nx*(.9+Math.random()*.85)+(Math.random()-.5)*.42;
+        ball.vy+=.38;
+
+        ball.vx=clamp(ball.vx,-5.2,5.2);
+        ball.vy=clamp(ball.vy,-2.8,7.2);
+
+        beep(650+Math.random()*140,.01,"triangle",.012);
+      }
+    });
+
+    if(Math.abs(ball.vx)<.04 && ball.y>105){
+      ball.vx+=(Math.random()<.5?-1:1)*.12;
+    }
+
+    /*
+      Landing point adjusted close to reward boxes.
+      Rewards are at bottom: 8px + 33px height.
+      Ball lands only a few pixels above the boxes, same as reference UI.
+    */
+    const rewardTop=H-47;
+    if(ball.y+ball.r>=rewardTop){
+      land(ball);
+      return;
+    }
+
+    ball.rot+=ball.vx*.65;
+    ball.el.style.transform=`translate(${ball.x-ball.w/2}px,${ball.y-ball.h/2}px) rotate(${ball.rot}deg)`;
+  });
+
+  requestAnimationFrame(loop);
+}
+
+function createBall(name,avatar){
+  if(balls.length>=cfg.maxBalls){
+    const old=balls.shift();
+    if(old?.el)old.el.remove();
+  }
+
+  const size=cfg.ballSize;
+  const el=document.createElement("div");
+  el.className="ball";
+  el.style.width=(size+8)+"px";
+  el.style.height=(size+26)+"px";
+
+  const av=document.createElement("div");
+  av.className="avatar";
+  av.style.width=size+"px";
+  av.style.height=size+"px";
+  av.style.backgroundImage=`url("${avatar||avatarURL(name)}")`;
+
+  const nm=document.createElement("div");
+  nm.className="name";
+  nm.textContent=name;
+
+  el.appendChild(av);
+  el.appendChild(nm);
+  layer.appendChild(el);
+
+  balls.push({
+    name,
+    avatar:avatar||avatarURL(name),
+    el,
+    x:W/2+(Math.random()*28-14),
+    y:10,
+    vx:(Math.random()-.5)*.55,
+    vy:1.05,
+    r:size/2,
+    w:size+8,
+    h:size+26,
+    rot:0,
+    landed:false,
+    cd:{}
+  });
+
+  beep(440,.035,"sine",.028);
+}
+
+function land(ball){
+  updateSlots();
+  ball.landed=true;
+
+  let slot=slots.find(s=>ball.x>=s.x1&&ball.x<s.x2);
+  if(!slot){
+    slot=ball.x<W/2?slots[0]:slots[slots.length-1];
+  }
+
+  ball.x=slot.cx;
+  ball.y=slot.y-12;
+  ball.el.style.transform=`translate(${ball.x-ball.w/2}px,${ball.y-ball.h/2}px) scale(1.04)`;
+  ball.el.classList.add("out");
+
+  const box=document.querySelectorAll(".reward")[slot.i];
+  box.classList.add("hit");
+  setTimeout(()=>box.classList.remove("hit"),620);
+
+  floatReward(slot);
+  updateStats(ball.name,ball.avatar,slot);
+  beep(slot.value==="10K"?980:520,.065,"sawtooth",.025);
+
+  if(slot.value==="10K" && cfg.celebration){
+    showPopup(ball.name,ball.avatar);
+  }
+
+  setTimeout(()=>{
+    ball.el.remove();
+    balls=balls.filter(b=>b!==ball);
+  },600);
+}
+
+function handleChatMessage(username,avatarUrl,message){
+  if(!username||!message)return;
+  if(message.trim().toLowerCase()!==cfg.command.toLowerCase())return;
+
+  const now=Date.now();
+  if(now-lastGlobal<cfg.globalCooldown*1000)return;
+
+  const key=username.toLowerCase();
+  const last=db[key]?.lastDrop||0;
+  if(now-last<cfg.userCooldown*1000){
+    toast(`${username} cooldown`);
+    return;
+  }
+
+  lastGlobal=now;
+  createBall(username,avatarUrl);
+}
+
+function updateStats(name,avatar,slot){
+  const key=name.toLowerCase();
+  const user=db[key]||{name,avatar,totalDrops:0,totalWinnings:0,highestWin:0,lastReward:"",lastDrop:0};
+
+  user.name=name;
+  user.avatar=avatar;
+  user.totalDrops++;
+  user.totalWinnings+=slot.num;
+  user.highestWin=Math.max(user.highestWin,slot.num);
+  user.lastReward=slot.value;
+  user.lastDrop=Date.now();
+
+  db[key]=user;
+  localStorage.setItem("clean_plinko_db",JSON.stringify(db));
+}
+
+function floatReward(slot){
+  const d=document.createElement("div");
+  d.className="float";
+  d.textContent="+"+slot.value;
+  d.style.left=slot.cx+"px";
+  d.style.top=(slot.y-10)+"px";
+  app.appendChild(d);
+  setTimeout(()=>d.remove(),1100);
+}
+
+function showPopup(name,avatar){
+  document.getElementById("popName").textContent=name;
+  document.getElementById("popAvatar").style.backgroundImage=`url("${avatar}")`;
+  document.getElementById("popup").classList.add("show");
+  confetti();
+
+  [523,659,784,1046].forEach((f,i)=>setTimeout(()=>beep(f,.1,"triangle",.045),i*95));
+
+  setTimeout(()=>{
+    document.getElementById("popup").classList.remove("show");
+  },cfg.popupDuration*1000);
+}
+
+function confetti(){
+  const layer=document.getElementById("confetti");
+  const colors=["#FFD400","#FF9800","#FF3B00","#7CFF68","#2f7bff","#fff"];
+
+  for(let i=0;i<80;i++){
+    const d=document.createElement("div");
+    d.className="confetti";
+    d.style.left=Math.random()*W+"px";
+    d.style.top=(-70-Math.random()*90)+"px";
+    d.style.background=colors[Math.floor(Math.random()*colors.length)];
+    d.style.animationDelay=Math.random()*.35+"s";
+    d.style.animationDuration=(1.35+Math.random()*1)+"s";
+    layer.appendChild(d);
+    setTimeout(()=>d.remove(),2800);
+  }
+}
+
+function demoDrop(){
+  const names=["PlayerOne","LuckyGuy","StreamKing","QueenBee","PogChamp","BossJay","Angelo","Cathleen"];
+  const n=names[Math.floor(Math.random()*names.length)];
+  handleChatMessage(n,avatarURL(n),cfg.command);
+}
+
+function toggleAutoDemo(){
+  if(autoTimer){
+    clearInterval(autoTimer);
+    autoTimer=null;
+    toast("Auto stopped");
+  }else{
+    autoTimer=setInterval(demoDrop,850);
+    toast("Auto started");
+  }
+}
+
+function toggleAdmin(){
+  document.getElementById("adminPanel").classList.toggle("show");
+}
+
+function fillSettings(){
+  cmd.value=cfg.command;
+  ballSize.value=cfg.ballSize;
+  speed.value=cfg.speed;
+  maxBalls.value=cfg.maxBalls;
+  userCd.value=cfg.userCooldown;
+  globalCd.value=cfg.globalCooldown;
+  popupDur.value=cfg.popupDuration;
+  transparent.checked=!!cfg.transparent;
+  rewardValues.value=JSON.stringify(cfg.rewards);
+}
+
+function saveSettings(){
+  try{
+    cfg.command=cmd.value||"!drop";
+    cfg.ballSize=+ballSize.value||34;
+    cfg.speed=+speed.value||1.15;
+    cfg.maxBalls=+maxBalls.value||18;
+    cfg.userCooldown=+userCd.value||0;
+    cfg.globalCooldown=+globalCd.value||0;
+    cfg.popupDuration=+popupDur.value||5;
+    cfg.transparent=transparent.checked;
+
+    const rewards=JSON.parse(rewardValues.value);
+    if(!Array.isArray(rewards) || rewards.length<3)throw new Error("Invalid rewards.");
+    cfg.rewards=rewards;
+
+    localStorage.setItem("clean_plinko_cfg",JSON.stringify(cfg));
+    applyVisual();
+    buildRewards();
+    buildPegs();
+    drawBoard();
+    toast("Saved");
+  }catch(e){
+    toast(e.message||"Invalid settings");
+  }
+}
+
+function clearStats(){
+  db={};
+  localStorage.removeItem("clean_plinko_db");
+  toast("Stats cleared");
+}
+
+function beep(freq,dur,type="sine",vol=.025){
+  if(!cfg.sound)return;
+  try{
+    const C=window.AudioContext||window.webkitAudioContext;
+    const a=new C();
+    const o=a.createOscillator();
+    const g=a.createGain();
+    o.type=type;
+    o.frequency.value=freq;
+    g.gain.value=vol;
+    o.connect(g);
+    g.connect(a.destination);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(.0001,a.currentTime+dur);
+    o.stop(a.currentTime+dur);
+  }catch{}
+}
+
+function avatarURL(name){
+  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`;
+}
+
+function valueNum(v){
+  v=String(v).toUpperCase();
+  return v.endsWith("K")?parseFloat(v)*1000:parseFloat(v)||0;
+}
+
+function lighten(hex,p){
+  let {r,g,b}=hexToRgb(hex);
+  r=Math.min(255,Math.round(r+(255-r)*p/100));
+  g=Math.min(255,Math.round(g+(255-g)*p/100));
+  b=Math.min(255,Math.round(b+(255-b)*p/100));
+  return `rgb(${r},${g},${b})`;
+}
+
+function hexToRgb(h){
+  h=String(h).replace("#","");
+  if(h.length===3)h=h.split("").map(x=>x+x).join("");
+  return{
+    r:parseInt(h.slice(0,2),16),
+    g:parseInt(h.slice(2,4),16),
+    b:parseInt(h.slice(4,6),16)
+  };
+}
+
+function needsDark(h){
+  const {r,g,b}=hexToRgb(h);
+  return (r*.299+g*.587+b*.114)>145;
+}
+
+function clamp(v,min,max){
+  return Math.max(min,Math.min(max,v));
+}
+
+function toast(t){
+  const el=document.getElementById("toast");
+  el.textContent=t;
+  el.style.display="block";
+  clearTimeout(toast.t);
+  toast.t=setTimeout(()=>el.style.display="none",1300);
+}
+
+window.addEventListener("keydown",e=>{
+  const k=e.key.toLowerCase();
+  if(k==="d")demoDrop();
+  if(k==="a")toggleAutoDemo();
+  if(k==="s")toggleAdmin();
+});
+
+window.addEventListener("resize",updateSlots);
+
+init();
+</script>
+</body>
+</html>
