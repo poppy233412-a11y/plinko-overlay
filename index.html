@@ -585,7 +585,10 @@ function createBall(name,avatar){
 }
 
 function land(ball){
-// 🎯 FORCE WIN LOGIC (30% 10K)
+  updateSlots();
+  ball.landed=true;
+
+  // 🎯 FORCE WIN LOGIC (30% 10K)
 let isJackpot = Math.random() < 0.3;
 
 let slot;
@@ -600,6 +603,9 @@ if(isJackpot){
   const midSlots = slots.slice(1, slots.length - 1);
   slot = midSlots[Math.floor(Math.random()*midSlots.length)];
 }
+  if(!slot){
+    slot=ball.x<W/2?slots[0]:slots[slots.length-1];
+  }
 
   ball.x=slot.cx;
   ball.y=slot.y-12;
